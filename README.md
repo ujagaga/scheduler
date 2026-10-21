@@ -17,6 +17,6 @@ On Loopia the app runs as CGI via `cgi_serve.py`. Point the cron at `https://<yo
 
 ## How `/tick` works
 
-- Current UTC hour is used (minutes ignored).
+- Each URL has its own time zone (default UTC); the current hour in that zone is used (minutes ignored).
 - If a URL has the current hour configured and its last triggered timestamp is not from
   this hour today, the timestamp is updated and the URL is requested with GET.

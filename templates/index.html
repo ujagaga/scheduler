@@ -4,7 +4,14 @@
 <form class="card" method="post" action="{{ url_for('save') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     {% if item %}<input type="hidden" name="id" value="{{ item.id }}">{% endif %}
-    <input type="url" name="url" required placeholder="https://..." value="{{ item.url if item else '' }}">
+    <div class="row">
+        <input type="url" name="url" required placeholder="https://..." value="{{ item.url if item else '' }}">
+        <select name="timezone">
+            {% for tz in timezones %}
+            <option value="{{ tz }}" {% if tz == (item.timezone if item else 'UTC') %}selected{% endif %}>{{ tz }}</option>
+            {% endfor %}
+        </select>
+    </div>
     <div class="hours">
         {% for h in range(24) %}
         <label class="hour"><input type="checkbox" name="hours" value="{{ h }}" {% if item and h in item.hours %}checked{% endif %}><span>{{ '%02d' % h }}</span></label>
@@ -12,7 +19,7 @@
     </div>
     <div class="footer">
         {% if item %}
-        <span class="muted">Last triggered: {{ item.last_triggered.strftime('%Y-%m-%d %H:%M') + ' UTC' if item.last_triggered else 'never' }}</span>
+        <span class="muted">Last triggered: {{ item.last_triggered.strftime('%Y-%m-%d %H:%M') if item.last_triggered else 'never' }}</span>
         <button type="submit" class="ghost" formaction="{{ url_for('delete', url_id=item.id) }}" formnovalidate
                 onclick="return confirm('Delete this URL?')">Delete</button>
         <button type="submit" class="primary">Save</button>
@@ -29,7 +36,7 @@
     <h1>Scheduler</h1>
     <a href="{{ url_for('logout') }}">Logout</a>
 </header>
-<p class="muted">Select the hours (UTC) when each URL should be triggered.</p>
+<p class="muted">Select the hours when each URL should be triggered, in that URL's time zone.</p>
 
 {% for item in urls %}
 {{ url_form(item) }}

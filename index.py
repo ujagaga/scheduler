@@ -9,6 +9,7 @@ import logging
 import os
 from datetime import datetime, timezone
 from functools import wraps
+from zoneinfo import ZoneInfo, available_timezones
 
 import requests
 from authlib.integrations.flask_client import OAuth
@@ -18,6 +19,8 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 import appsettings
 import database
+
+TIMEZONES = sorted(available_timezones())
 
 current_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -99,7 +102,7 @@ def logout():
 @application.route("/")
 @login_required
 def index():
-    return render_template("index.html", urls=database.get_urls())
+    return render_template("index.html", urls=database.get_urls(), timezones=TIMEZONES)
 
 
 @application.route("/save", methods=["POST"])
@@ -107,15 +110,18 @@ def index():
 def save():
     url = request.form.get("url", "").strip()
     hours = sorted({int(h) for h in request.form.getlist("hours") if h.isdigit() and int(h) < 24})
+    tz = request.form.get("timezone", "UTC")
+    if tz not in TIMEZONES:
+        tz = "UTC"
     if not url.startswith(("http://", "https://")):
         flash("URL must start with http:// or https://")
         return redirect(url_for("index"))
 
     url_id = request.form.get("id")
     if url_id:
-        database.update_url(url_id, url, hours)
+        database.update_url(url_id, url, hours, tz)
     else:
-        database.add_url(url, hours)
+        database.add_url(url, hours, tz)
     return redirect(url_for("index"))
 
 
@@ -132,20 +138,21 @@ def tick():
     now = datetime.now(timezone.utc)
     results = []
     for item in database.get_urls():
-        if now.hour not in item["hours"]:
+        local_now = now.astimezone(ZoneInfo(item["timezone"]))
+        if local_now.hour not in item["hours"]:
             continue
         last = item["last_triggered"]
-        if last and last.date() == now.date() and last.hour == now.hour:
+        if last and last.date() == local_now.date() and last.hour == local_now.hour:
             continue  # already triggered this hour
 
         database.set_last_triggered(item["id"], now)
         try:
             r = requests.get(item["url"], timeout=30)
-            results.append(f"{item['url']} -> {r.status_code}")
+            results.append(f"{item['url']} ({item['timezone']} {local_now.hour:02d}h) -> {r.status_code}")
         except requests.RequestException as e:
-            results.append(f"{item['url']} -> ERROR {e}")
+            results.append(f"{item['url']} ({item['timezone']} {local_now.hour:02d}h) -> ERROR {e}")
     for line in results:
-        logger.info(f"tick {now.hour:02d}h: {line}")
+        logger.info(f"tick {now.hour:02d}h UTC: {line}")
     return "\n".join(results) or "nothing to trigger", 200, {"Content-Type": "text/plain"}
 
 

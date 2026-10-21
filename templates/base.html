@@ -28,9 +28,12 @@
 
         .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px;
                 padding: 16px; margin-bottom: 14px; box-shadow: 0 1px 2px rgb(0 0 0 / 0.04); }
-        input[type=url] { width: 100%; padding: 9px 12px; font: inherit; color: var(--text);
-                          background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
-        input[type=url]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+        .row { display: flex; gap: 8px; }
+        .row input { flex: 1; min-width: 0; }
+        @media (max-width: 560px) { .row { flex-direction: column; } }
+        input[type=url], select { padding: 9px 12px; font: inherit; color: var(--text);
+                                  background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
+        input[type=url]:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 
         .hours { display: grid; grid-template-columns: repeat(12, 1fr); gap: 6px; margin: 14px 0; }
         @media (max-width: 560px) { .hours { grid-template-columns: repeat(6, 1fr); } }

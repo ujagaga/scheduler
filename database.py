@@ -2,6 +2,7 @@ import os
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import appsettings
 
@@ -26,6 +27,7 @@ def setup_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 url TEXT NOT NULL,
                 hours TEXT NOT NULL DEFAULT '',
+                timezone TEXT NOT NULL DEFAULT 'UTC',
                 last_triggered TEXT
             );
         """)
@@ -33,22 +35,24 @@ def setup_db():
 
 def get_urls():
     with _db() as conn:
-        urls = [dict(r) for r in conn.execute("SELECT id, url, hours, last_triggered FROM urls ORDER BY id")]
+        urls = [dict(r) for r in conn.execute("SELECT id, url, hours, timezone, last_triggered FROM urls ORDER BY id")]
     for u in urls:
         u["hours"] = [int(h) for h in u["hours"].split(",") if h]
         if u["last_triggered"]:
-            u["last_triggered"] = datetime.fromisoformat(u["last_triggered"])
+            # Stored in UTC, returned in the URL's time zone
+            u["last_triggered"] = datetime.fromisoformat(u["last_triggered"]).astimezone(ZoneInfo(u["timezone"]))
     return urls
 
 
-def add_url(url, hours):
+def add_url(url, hours, tz):
     with _db() as conn:
-        conn.execute("INSERT INTO urls (url, hours) VALUES (?, ?)", (url, ",".join(map(str, hours))))
+        conn.execute("INSERT INTO urls (url, hours, timezone) VALUES (?, ?, ?)", (url, ",".join(map(str, hours)), tz))
 
 
-def update_url(url_id, url, hours):
+def update_url(url_id, url, hours, tz):
     with _db() as conn:
-        conn.execute("UPDATE urls SET url = ?, hours = ? WHERE id = ?", (url, ",".join(map(str, hours)), url_id))
+        conn.execute("UPDATE urls SET url = ?, hours = ?, timezone = ? WHERE id = ?",
+                     (url, ",".join(map(str, hours)), tz, url_id))
 
 
 def delete_url(url_id):
