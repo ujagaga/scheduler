@@ -7,13 +7,14 @@ import argparse
 import json
 import logging
 import os
+import secrets
 from datetime import datetime, timezone
 from functools import wraps
+from urllib.parse import urlencode
 from zoneinfo import ZoneInfo, available_timezones
 
 import requests
-from authlib.integrations.flask_client import OAuth
-from flask import Flask, render_template, redirect, request, session, url_for, flash
+from flask import Flask, render_template, redirect, request, session, url_for as flask_url_for, flash
 from flask_wtf import CSRFProtect
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -40,24 +41,35 @@ csrf = CSRFProtect(application)
 database.setup_db()
 
 # ---------------------- OAuth ----------------------
+# Plain Google OAuth2 authorization code flow with requests (no Authlib / cryptography dependency)
+GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"
+OAUTH_REDIRECT_URI = f"{appsettings.APP_URL.rstrip('/')}/oauth2callback"
+
 with open(os.path.join(current_path, appsettings.CLIENT_SECRETS_FILE)) as f:
     client_secrets = json.load(f)["web"]
 
-oauth = OAuth(application)
-google = oauth.register(
-    name="google",
-    client_id=client_secrets["client_id"],
-    client_secret=client_secrets["client_secret"],
-    server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
-    client_kwargs={"scope": "openid email"},
-)
+
+def safe_url_for(endpoint, **values):
+    """Strip CGI SCRIPT_NAME from generated URLs."""
+    url = flask_url_for(endpoint, **values)
+    script_name = request.environ.get("SCRIPT_NAME", "")
+    if script_name and url.startswith(script_name):
+        url = url[len(script_name):] or "/"
+    return url
+
+
+@application.context_processor
+def inject_global_vars():
+    return {"url_for": safe_url_for}
 
 
 def login_required(view):
     @wraps(view)
     def wrapper(*args, **kwargs):
         if session.get("email") != appsettings.ADMIN_EMAIL.lower():
-            return redirect(url_for("login"))
+            return redirect(safe_url_for("login"))
         return view(*args, **kwargs)
     return wrapper
 
@@ -69,33 +81,54 @@ def login():
 
 @application.route("/authorize")
 def authorize():
-    return google.authorize_redirect(url_for("oauth2callback", _external=True))
+    session["oauth_state"] = secrets.token_urlsafe(24)
+    params = {
+        "client_id": client_secrets["client_id"],
+        "redirect_uri": OAUTH_REDIRECT_URI,
+        "response_type": "code",
+        "scope": "openid email",
+        "state": session["oauth_state"],
+    }
+    return redirect(f"{GOOGLE_AUTH_URL}?{urlencode(params)}")
 
 
 @application.route("/oauth2callback")
 def oauth2callback():
     try:
-        user_info = google.authorize_access_token()["userinfo"]
+        if not request.args.get("state") or request.args.get("state") != session.pop("oauth_state", None):
+            raise ValueError("Invalid OAuth state")
+        token_resp = requests.post(GOOGLE_TOKEN_URL, timeout=30, data={
+            "code": request.args.get("code"),
+            "client_id": client_secrets["client_id"],
+            "client_secret": client_secrets["client_secret"],
+            "redirect_uri": OAUTH_REDIRECT_URI,
+            "grant_type": "authorization_code",
+        })
+        token_resp.raise_for_status()
+        user_resp = requests.get(GOOGLE_USERINFO_URL, timeout=30,
+                                 headers={"Authorization": f"Bearer {token_resp.json()['access_token']}"})
+        user_resp.raise_for_status()
+        user_info = user_resp.json()
     except Exception as e:
         logger.exception(f"OAuth2 callback error {e}")
         flash("Google login failed.")
-        return redirect(url_for("login"))
+        return redirect(safe_url_for("login"))
 
     email = user_info.get("email", "").lower()
     if not user_info.get("email_verified") or email != appsettings.ADMIN_EMAIL.lower():
         logger.warning(f"Unauthorized login attempt: {email}")
         flash("This account is not authorized.")
-        return redirect(url_for("login"))
+        return redirect(safe_url_for("login"))
 
     session.clear()
     session["email"] = email
-    return redirect(url_for("index"))
+    return redirect(safe_url_for("index"))
 
 
 @application.route("/logout")
 def logout():
     session.clear()
-    return redirect(url_for("login"))
+    return redirect(safe_url_for("login"))
 
 
 # ---------------------- URLs ----------------------
@@ -115,21 +148,21 @@ def save():
         tz = "UTC"
     if not url.startswith(("http://", "https://")):
         flash("URL must start with http:// or https://")
-        return redirect(url_for("index"))
+        return redirect(safe_url_for("index"))
 
     url_id = request.form.get("id")
     if url_id:
         database.update_url(url_id, url, hours, tz)
     else:
         database.add_url(url, hours, tz)
-    return redirect(url_for("index"))
+    return redirect(safe_url_for("index"))
 
 
 @application.route("/delete/<int:url_id>", methods=["POST"])
 @login_required
 def delete(url_id):
     database.delete_url(url_id)
-    return redirect(url_for("index"))
+    return redirect(safe_url_for("index"))
 
 
 # ---------------------- Tick ----------------------

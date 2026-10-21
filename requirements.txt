@@ -1,5 +1,4 @@
 flask
 flask-wtf
-authlib
 requests
 tzdata

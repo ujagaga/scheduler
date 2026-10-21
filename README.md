@@ -6,7 +6,7 @@ An external hourly cron calls `/tick`; the app does the rest.
 ## Setup
 
 1. `pip install -r requirements.txt`
-2. `cp appsettings.example.py appsettings.py` and fill in `SECRET_KEY` and `ADMIN_EMAIL`.
+2. `cp appsettings.example.py appsettings.py` and fill in `SECRET_KEY`, `ADMIN_EMAIL` and `APP_URL`.
 3. In Google Cloud Console create an OAuth client (Web application), add redirect URI
    `https://<your-domain>/oauth2callback` (and `http://localhost:8000/oauth2callback` for local),
    download the JSON as `client_secret.json`.
