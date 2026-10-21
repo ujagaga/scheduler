@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Scheduler</title>
+    <style>
+        :root {
+            --bg: #f4f5f7; --card: #fff; --text: #1f2328; --muted: #6b7280; --border: #e3e5e8;
+            --accent: #4f46e5; --accent-text: #fff; --pill: #eef0f3; --danger: #dc2626; --flash: #fef3c7;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0f1115; --card: #181b21; --text: #e6e8eb; --muted: #9aa1ab; --border: #2a2f37;
+                --accent: #818cf8; --accent-text: #0f1115; --pill: #232830; --danger: #f87171; --flash: #3b3216;
+            }
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: var(--bg); color: var(--text);
+               font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+        main { max-width: 860px; margin: 0 auto; padding: 24px 16px 48px; }
+        a { color: var(--accent); text-decoration: none; }
+        h1 { font-size: 1.5rem; margin: 0; }
+        h2 { font-size: 1.05rem; margin: 32px 0 12px; color: var(--muted); font-weight: 600; }
+        header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+        .muted { color: var(--muted); font-size: 0.875rem; }
+        .flash { background: var(--flash); padding: 10px 14px; border-radius: 8px; margin: 0 0 16px; }
+
+        .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+                padding: 16px; margin-bottom: 14px; box-shadow: 0 1px 2px rgb(0 0 0 / 0.04); }
+        input[type=url] { width: 100%; padding: 9px 12px; font: inherit; color: var(--text);
+                          background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
+        input[type=url]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+        .hours { display: grid; grid-template-columns: repeat(12, 1fr); gap: 6px; margin: 14px 0; }
+        @media (max-width: 560px) { .hours { grid-template-columns: repeat(6, 1fr); } }
+        .hour input { position: absolute; opacity: 0; pointer-events: none; }
+        .hour span { display: block; text-align: center; padding: 6px 0; border-radius: 6px; cursor: pointer;
+                     background: var(--pill); font-size: 0.8rem; font-variant-numeric: tabular-nums;
+                     user-select: none; transition: background .12s, color .12s; }
+        .hour span:hover { outline: 1px solid var(--accent); }
+        .hour input:checked + span { background: var(--accent); color: var(--accent-text); font-weight: 600; }
+        .hour input:focus-visible + span { outline: 2px solid var(--accent); }
+
+        .footer { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .footer .muted { margin-right: auto; }
+        button, .button { font: inherit; font-size: 0.875rem; padding: 7px 16px; border-radius: 8px;
+                          cursor: pointer; border: 1px solid transparent; display: inline-block; }
+        .primary { background: var(--accent); color: var(--accent-text); }
+        .primary:hover { filter: brightness(1.1); }
+        .ghost { background: transparent; color: var(--danger); border-color: var(--border); }
+        .ghost:hover { border-color: var(--danger); }
+
+        .login { min-height: 100vh; display: grid; place-items: center; }
+        .login .card { text-align: center; padding: 40px 48px; }
+        .login h1 { margin-bottom: 8px; }
+        .login .button { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    {% block body %}
+    <main>
+        {% for message in get_flashed_messages() %}
+        <p class="flash">{{ message }}</p>
+        {% endfor %}
+        {% block content %}{% endblock %}
+    </main>
+    {% endblock %}
+</body>
+</html>

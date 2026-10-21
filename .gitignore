@@ -1,0 +1,7 @@
+.idea/
+.venv/
+__pycache__
+database.db
+appsettings.py
+client_secret.json
+app.log

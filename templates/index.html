@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% macro url_form(item=None) %}
+<form class="card" method="post" action="{{ url_for('save') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% if item %}<input type="hidden" name="id" value="{{ item.id }}">{% endif %}
+    <input type="url" name="url" required placeholder="https://..." value="{{ item.url if item else '' }}">
+    <div class="hours">
+        {% for h in range(24) %}
+        <label class="hour"><input type="checkbox" name="hours" value="{{ h }}" {% if item and h in item.hours %}checked{% endif %}><span>{{ '%02d' % h }}</span></label>
+        {% endfor %}
+    </div>
+    <div class="footer">
+        {% if item %}
+        <span class="muted">Last triggered: {{ item.last_triggered.strftime('%Y-%m-%d %H:%M') + ' UTC' if item.last_triggered else 'never' }}</span>
+        <button type="submit" class="ghost" formaction="{{ url_for('delete', url_id=item.id) }}" formnovalidate
+                onclick="return confirm('Delete this URL?')">Delete</button>
+        <button type="submit" class="primary">Save</button>
+        {% else %}
+        <span class="muted"></span>
+        <button type="submit" class="primary">Add</button>
+        {% endif %}
+    </div>
+</form>
+{% endmacro %}
+
+{% block content %}
+<header>
+    <h1>Scheduler</h1>
+    <a href="{{ url_for('logout') }}">Logout</a>
+</header>
+<p class="muted">Select the hours (UTC) when each URL should be triggered.</p>
+
+{% for item in urls %}
+{{ url_form(item) }}
+{% endfor %}
+
+<h2>Add URL</h2>
+{{ url_form() }}
+{% endblock %}

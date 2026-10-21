@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block body %}
+<main class="login">
+    <div class="card">
+        <h1>Scheduler</h1>
+        <p class="muted">Hourly URL triggers</p>
+        {% for message in get_flashed_messages() %}
+        <p class="flash">{{ message }}</p>
+        {% endfor %}
+        <a class="button primary" href="{{ url_for('authorize') }}">Sign in with Google</a>
+    </div>
+</main>
+{% endblock %}
