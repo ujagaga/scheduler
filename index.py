@@ -8,7 +8,9 @@ import json
 import logging
 import os
 import secrets
+import smtplib
 from datetime import datetime, timezone
+from email.mime.text import MIMEText
 from functools import wraps
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo, available_timezones
@@ -166,6 +168,35 @@ def delete(url_id):
 
 
 # ---------------------- Tick ----------------------
+def check_status(response):
+    """Error text if the response is not the standard {"success": true, ...} status, else None.
+    Services that return non-JSON are only checked by HTTP status."""
+    try:
+        status = response.json()
+    except ValueError:
+        status = None
+    if not isinstance(status, dict) or "success" not in status:
+        return None if response.ok else f"HTTP {response.status_code}: {response.text[:500]}"
+    if status["success"] is True and response.ok:
+        return None
+    return (f"HTTP {response.status_code}: {status.get('error') or 'success=false'}\n\n"
+            f"Details:\n{json.dumps(status.get('details'), indent=2, ensure_ascii=False)}")
+
+
+def send_alert(url, error):
+    try:
+        msg = MIMEText(f"{url}\n\n{error}", "plain", "utf-8")
+        msg["From"] = appsettings.SMTP_USER
+        msg["To"] = appsettings.ADMIN_EMAIL
+        msg["Subject"] = f"Scheduler: {url} needs attention"
+        with smtplib.SMTP(appsettings.SMTP_SERVER, appsettings.SMTP_PORT, timeout=30) as server:
+            server.starttls()
+            server.login(appsettings.SMTP_USER, appsettings.SMTP_PASS)
+            server.sendmail(appsettings.SMTP_USER, appsettings.ADMIN_EMAIL, msg.as_string())
+    except Exception:
+        logger.exception(f"Could not send alert for {url}")
+
+
 @application.route("/tick")
 def tick():
     now = datetime.now(timezone.utc)
@@ -181,9 +212,13 @@ def tick():
         database.set_last_triggered(item["id"], now)
         try:
             r = requests.get(item["url"], timeout=30)
+            error = check_status(r)
             results.append(f"{item['url']} ({item['timezone']} {local_now.hour:02d}h) -> {r.status_code}")
         except requests.RequestException as e:
+            error = f"Request failed: {e}"
             results.append(f"{item['url']} ({item['timezone']} {local_now.hour:02d}h) -> ERROR {e}")
+        if error:
+            send_alert(item["url"], error)
     for line in results:
         logger.info(f"tick {now.hour:02d}h UTC: {line}")
     return "\n".join(results) or "nothing to trigger", 200, {"Content-Type": "text/plain"}
