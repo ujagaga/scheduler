@@ -22,6 +22,7 @@
         <span class="muted">Last triggered: {{ item.last_triggered.strftime('%Y-%m-%d %H:%M') if item.last_triggered else 'never' }}</span>
         <button type="submit" class="ghost" formaction="{{ url_for('delete', url_id=item.id) }}" formnovalidate
                 onclick="return confirm('Delete this URL?')">Delete</button>
+        <button type="submit" class="secondary" formaction="{{ url_for('trigger', url_id=item.id) }}" formnovalidate>Trigger</button>
         <button type="submit" class="primary">Save</button>
         {% else %}
         <span class="muted"></span>

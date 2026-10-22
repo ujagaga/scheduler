@@ -167,6 +167,20 @@ def delete(url_id):
     return redirect(safe_url_for("index"))
 
 
+@application.route("/trigger/<int:url_id>", methods=["POST"])
+@login_required
+def trigger(url_id):
+    item = next((u for u in database.get_urls() if u["id"] == url_id), None)
+    if item:
+        try:
+            r = requests.get(item["url"], timeout=30)
+            error = check_status(r)
+            flash(f"{item['url']} -> {error or r.status_code}")
+        except requests.RequestException as e:
+            flash(f"{item['url']} -> Request failed: {e}")
+    return redirect(safe_url_for("index"))
+
+
 # ---------------------- Tick ----------------------
 def check_status(response):
     """Error text if the response is not the standard {"success": true, ...} status, else None.
